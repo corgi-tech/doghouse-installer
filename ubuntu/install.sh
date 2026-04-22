@@ -99,14 +99,16 @@ step_node() {
   # Install nvm if missing
   [ ! -d "$HOME/.nvm" ] && curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
 
-  # Always source nvm — don't trust PATH state, since Windows interop pollutes it
+  # Always source nvm — don't trust PATH state, since Windows interop pollutes it.
+  # nvm.sh references undeclared variables internally, so we must relax set -u while
+  # sourcing and running nvm commands (otherwise: "PROVIDED_VERSION: unbound variable").
   export NVM_DIR="$HOME/.nvm"
+  set +u
   # shellcheck disable=SC1091
   . "$NVM_DIR/nvm.sh"
-
-  # Install/activate LTS (idempotent — nvm detects already-installed)
   nvm install --lts >/dev/null
   nvm use --lts >/dev/null
+  set -u
 
   # Verify we're now pointing at Linux Node, not Windows
   local node_path npm_path

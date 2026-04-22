@@ -114,12 +114,15 @@ step_node() {
   # Install nvm if missing
   [ ! -d "$HOME/.nvm" ] && curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
 
+  # nvm.sh references undeclared variables internally — relax set -u while sourcing
+  # and running nvm commands (otherwise: "PROVIDED_VERSION: unbound variable").
   export NVM_DIR="$HOME/.nvm"
+  set +u
   # shellcheck disable=SC1091
   . "$NVM_DIR/nvm.sh"
-
   nvm install --lts >/dev/null
   nvm use --lts >/dev/null
+  set -u
 
   ok "Linux/macOS Node $(node --version) at $(command -v node)"
 }
