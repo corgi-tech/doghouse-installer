@@ -14,16 +14,16 @@ Pick the command for your platform, paste it into a terminal, follow the prompts
 curl -fsSL https://raw.githubusercontent.com/corgi-tech/doghouse-installer/main/ubuntu/install.sh -o /tmp/install.sh && bash /tmp/install.sh
 ```
 
-### macOS *(coming soon)*
+### macOS
 
 ```bash
-# Not yet available
+curl -fsSL https://raw.githubusercontent.com/corgi-tech/doghouse-installer/main/macos/install.sh -o /tmp/install.sh && bash /tmp/install.sh
 ```
 
-### Arch / Manjaro *(coming soon)*
+### Arch / Manjaro / EndeavourOS
 
 ```bash
-# Not yet available
+curl -fsSL https://raw.githubusercontent.com/corgi-tech/doghouse-installer/main/arch/install.sh -o /tmp/install.sh && bash /tmp/install.sh
 ```
 
 All installer scripts are **idempotent** — safe to re-run at any time.
@@ -51,8 +51,8 @@ Every platform installer follows the same outline, adapted to the local package 
 Platform-specific, but generally:
 
 - **Ubuntu / WSL**: Windows 10+ with WSL installed (`wsl --install -d Ubuntu-24.04` in PowerShell), or a native Ubuntu machine. Internet connection.
-- **macOS**: (TBD — script not yet written)
-- **Arch / Manjaro**: (TBD — script not yet written)
+- **macOS**: macOS 11+ recommended. Xcode Command Line Tools must be installed before running — if missing, the script will tell you to run `xcode-select --install` and re-run.
+- **Arch / Manjaro / EndeavourOS**: Any recent Arch-family release. `sudo` access. Internet connection.
 
 ## Repository layout
 
@@ -60,14 +60,16 @@ Platform-specific, but generally:
 doghouse-installer/
 ├── README.md          ← this file
 ├── ubuntu/
-│   └── install.sh     ← Ubuntu / WSL installer
-├── macos/             ← (planned)
-│   └── install.sh
-└── arch/              ← (planned)
-    └── install.sh
+│   └── install.sh     ← Ubuntu / WSL installer (apt + bash)
+├── macos/
+│   └── install.sh     ← macOS installer (brew + zsh-aware)
+└── arch/
+    └── install.sh     ← Arch / Manjaro / EndeavourOS installer (pacman)
 ```
 
-Shared logic may be factored out later once a second platform lands. For now each script is fully standalone.
+Each script is fully standalone — no shared library. The three scripts share ~90% of their logic (SSH keys, API key prompt, doghouse clone, Claude install, verify). Only the package-manager and shell-detection steps differ.
+
+Refactoring into a shared `lib/` is future work once a fourth platform or CI test harness arrives.
 
 ## Troubleshooting
 
