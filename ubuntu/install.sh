@@ -82,18 +82,40 @@ step_prereqs() {
 }
 
 # ═══ STEP 2: Node.js via nvm (for npx / MCP servers) ═══
+# Important: WSL's Windows interop exposes Windows-side Node (/mnt/c/Program Files/nodejs/)
+# into the Linux PATH. Windows npm's WSL detection is broken and incorrectly reports
+# "WSL 1 is not supported" even on WSL2. We must install and use Linux Node via nvm,
+# ignoring whatever Windows has on PATH.
 step_node() {
   hdr "Installing Node.js (for MCP servers: playwright, context7, linear)"
-  if command -v npx >/dev/null; then
-    ok "npx already available: $(node --version)"
-    return
+
+  # Detect if Windows Node is leaking into PATH — warn the user
+  local win_node
+  win_node=$(command -v node 2>/dev/null || true)
+  if [[ "$win_node" == /mnt/c/* ]]; then
+    warn "Windows Node detected at $win_node — will be superseded by Linux nvm install."
   fi
+
+  # Install nvm if missing
   [ ! -d "$HOME/.nvm" ] && curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+
+  # Always source nvm — don't trust PATH state, since Windows interop pollutes it
   export NVM_DIR="$HOME/.nvm"
   # shellcheck disable=SC1091
   . "$NVM_DIR/nvm.sh"
+
+  # Install/activate LTS (idempotent — nvm detects already-installed)
   nvm install --lts >/dev/null
-  ok "Node.js $(node --version) installed"
+  nvm use --lts >/dev/null
+
+  # Verify we're now pointing at Linux Node, not Windows
+  local node_path npm_path
+  node_path=$(command -v node)
+  npm_path=$(command -v npm)
+  [[ "$node_path" == /mnt/c/* ]] && die "PATH still resolving to Windows Node ($node_path). Uninstall Windows Node.js or fix PATH ordering."
+  [[ "$npm_path"  == /mnt/c/* ]] && die "PATH still resolving to Windows npm ($npm_path). Uninstall Windows Node.js or fix PATH ordering."
+
+  ok "Linux Node $(node --version) at $node_path"
 }
 
 # ═══ STEP 3: uv (for uvx / Python MCP servers) ═══
