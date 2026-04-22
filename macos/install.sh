@@ -139,6 +139,32 @@ step_uv() {
   ok "uv $(uv --version 2>/dev/null | awk '{print $2}') installed"
 }
 
+# ═══ STEP 3b: Ollama (required for doghouse memory indexing) ═══
+step_ollama() {
+  hdr "Installing Ollama (required for memory indexing)"
+
+  if command -v ollama >/dev/null 2>&1; then
+    ok "Ollama already installed: $(ollama --version 2>&1 | head -1)"
+  else
+    log "Installing via brew..."
+    brew install ollama
+    command -v ollama >/dev/null 2>&1 || die "Ollama install failed — command not found on PATH."
+    ok "Ollama installed: $(ollama --version 2>&1 | head -1)"
+  fi
+
+  # Ensure ollama is running. Prefer brew services (launchd), fall back to background process.
+  if pgrep -x ollama >/dev/null 2>&1; then
+    ok "ollama is already running"
+  elif brew services start ollama >/dev/null 2>&1; then
+    sleep 2
+    pgrep -x ollama >/dev/null 2>&1 && ok "ollama started (brew services)" || warn "brew services started but process not visible — check 'brew services list'"
+  else
+    nohup ollama serve >/tmp/ollama.log 2>&1 &
+    sleep 3
+    pgrep -x ollama >/dev/null 2>&1 && ok "ollama started as background process (log: /tmp/ollama.log)" || warn "Could not start ollama — memory indexing may not work"
+  fi
+}
+
 # ═══ STEP 4: shell hygiene ═══
 step_shell() {
   hdr "Configuring shell ($SHELL_NAME)"
@@ -342,6 +368,7 @@ main() {
   step_prereqs
   step_node
   step_uv
+  step_ollama
   step_shell
   step_claude
   step_git_identity

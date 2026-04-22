@@ -102,6 +102,39 @@ step_uv() {
   ok "uv $(uv --version 2>/dev/null | awk '{print $2}') installed"
 }
 
+# ═══ STEP 3b: Ollama (required for doghouse memory indexing) ═══
+step_ollama() {
+  hdr "Installing Ollama (required for memory indexing)"
+
+  if command -v ollama >/dev/null 2>&1; then
+    ok "Ollama already installed: $(ollama --version 2>&1 | head -1)"
+  else
+    log "Installing via pacman..."
+    sudo pacman -S --noconfirm --needed ollama
+    command -v ollama >/dev/null 2>&1 || die "Ollama install failed — command not found on PATH."
+    ok "Ollama installed: $(ollama --version 2>&1 | head -1)"
+  fi
+
+  # Arch ships with systemd, so prefer the unit. Fall back to background process if needed.
+  if pgrep -x ollama >/dev/null 2>&1; then
+    ok "ollama is already running"
+  elif command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+    sudo systemctl enable --now ollama 2>/dev/null || true
+    if systemctl is-active --quiet ollama; then
+      ok "ollama service started (systemd)"
+    else
+      warn "systemctl start failed — launching as background process"
+      nohup ollama serve >/tmp/ollama.log 2>&1 &
+      sleep 3
+      pgrep -x ollama >/dev/null 2>&1 && ok "ollama started (log: /tmp/ollama.log)" || warn "Could not start ollama — memory indexing may not work"
+    fi
+  else
+    nohup ollama serve >/tmp/ollama.log 2>&1 &
+    sleep 3
+    pgrep -x ollama >/dev/null 2>&1 && ok "ollama started as background process (log: /tmp/ollama.log)" || warn "Could not start ollama — memory indexing may not work"
+  fi
+}
+
 # ═══ STEP 4: shell hygiene ═══
 step_shell() {
   hdr "Configuring shell"
@@ -291,6 +324,7 @@ main() {
   step_prereqs
   step_node
   step_uv
+  step_ollama
   step_shell
   step_claude
   step_git_identity

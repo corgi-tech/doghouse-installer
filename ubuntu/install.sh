@@ -71,6 +71,53 @@ step_preflight() {
   ok "Preflight passed"
 }
 
+# ═══ STEP 0.5: WSL systemd — required for Tailscale and Ollama daemons ═══
+step_wsl_systemd() {
+  # Skip on non-WSL systems (native Ubuntu has systemd by default)
+  grep -qi microsoft /proc/version 2>/dev/null || return 0
+
+  hdr "Checking WSL systemd"
+
+  # Already running? We're good.
+  if [ -d /run/systemd/system ]; then
+    ok "systemd is active"
+    return 0
+  fi
+
+  # Configured in /etc/wsl.conf but not active yet → needs WSL restart
+  if [ -f /etc/wsl.conf ] && grep -qE '^\s*systemd\s*=\s*true' /etc/wsl.conf; then
+    warn "systemd is configured in /etc/wsl.conf but WSL hasn't been restarted."
+    if command -v wsl.exe >/dev/null 2>&1; then
+      warn "Auto-triggering WSL shutdown in 5 seconds via Windows interop (Ctrl-C to cancel)..."
+      sleep 5
+      wsl.exe --shutdown
+      # wsl.exe --shutdown kills our process — if we reach here, interop didn't work
+      die "wsl.exe --shutdown ran but we're still here. Please run 'wsl --shutdown' from Windows PowerShell manually, then reopen this terminal and re-run the installer."
+    fi
+    die "From Windows PowerShell, run:  wsl --shutdown
+  Then reopen this terminal and re-run the installer."
+  fi
+
+  # Not configured — enable it now
+  log "Enabling systemd in /etc/wsl.conf..."
+  sudo tee /etc/wsl.conf >/dev/null <<'EOF'
+[boot]
+systemd=true
+EOF
+  ok "systemd enabled in /etc/wsl.conf"
+
+  if command -v wsl.exe >/dev/null 2>&1; then
+    warn "WSL must restart for systemd to take effect."
+    warn "Auto-triggering WSL shutdown in 5 seconds via Windows interop (Ctrl-C to cancel)..."
+    sleep 5
+    wsl.exe --shutdown
+    die "wsl.exe --shutdown ran but we're still here. Please run 'wsl --shutdown' from Windows PowerShell, reopen this terminal, re-run the installer."
+  fi
+  die "WSL must restart for systemd to take effect.
+  From Windows PowerShell, run:  wsl --shutdown
+  Then reopen this terminal and re-run the installer."
+}
+
 # ═══ STEP 1: system prerequisites ═══
 step_prereqs() {
   hdr "Installing system prerequisites"
@@ -130,6 +177,39 @@ step_uv() {
   curl -LsSf https://astral.sh/uv/install.sh | sh
   export PATH="$HOME/.local/bin:$PATH"
   ok "uv $(uv --version 2>/dev/null | awk '{print $2}') installed"
+}
+
+# ═══ STEP 3b: Ollama (required for doghouse memory indexing) ═══
+step_ollama() {
+  hdr "Installing Ollama (required for memory indexing)"
+
+  if command -v ollama >/dev/null 2>&1; then
+    ok "Ollama already installed: $(ollama --version 2>&1 | head -1)"
+  else
+    log "Running official Ollama installer..."
+    curl -fsSL https://ollama.com/install.sh | sh
+    command -v ollama >/dev/null 2>&1 || die "Ollama install failed — command not found on PATH."
+    ok "Ollama installed: $(ollama --version 2>&1 | head -1)"
+  fi
+
+  # Ensure ollama service is running. Prefer systemd, fall back to background process.
+  if pgrep -x ollama >/dev/null 2>&1; then
+    ok "ollama is already running"
+  elif command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+    sudo systemctl enable --now ollama 2>/dev/null || true
+    if systemctl is-active --quiet ollama; then
+      ok "ollama service started (systemd)"
+    else
+      warn "systemctl start failed — launching as background process"
+      nohup ollama serve >/tmp/ollama.log 2>&1 &
+      sleep 3
+      pgrep -x ollama >/dev/null 2>&1 && ok "ollama started (log: /tmp/ollama.log)" || warn "Could not start ollama — memory indexing may not work"
+    fi
+  else
+    nohup ollama serve >/tmp/ollama.log 2>&1 &
+    sleep 3
+    pgrep -x ollama >/dev/null 2>&1 && ok "ollama started as background process (log: /tmp/ollama.log)" || warn "Could not start ollama — memory indexing may not work"
+  fi
 }
 
 # ═══ STEP 4: shell hygiene ═══
@@ -332,9 +412,11 @@ main() {
   confirm_continue "Ready?"
 
   step_preflight
+  step_wsl_systemd
   step_prereqs
   step_node
   step_uv
+  step_ollama
   step_shell
   step_claude
   step_git_identity
