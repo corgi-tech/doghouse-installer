@@ -70,18 +70,21 @@ step_prereqs() {
 }
 
 # ═══ STEP 2: Node.js via nvm ═══
+# Always source nvm and install LTS — both nvm and "nvm install --lts" are idempotent.
+# Don't trust PATH state; stale pacman-installed node can conflict with nvm-managed node.
 step_node() {
   hdr "Installing Node.js (for MCP servers: playwright, context7, linear)"
-  if command -v npx >/dev/null 2>&1; then
-    ok "npx already available: $(node --version)"
-    return
-  fi
+
   [ ! -d "$HOME/.nvm" ] && curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+
   export NVM_DIR="$HOME/.nvm"
   # shellcheck disable=SC1091
   . "$NVM_DIR/nvm.sh"
+
   nvm install --lts >/dev/null
-  ok "Node.js $(node --version) installed"
+  nvm use --lts >/dev/null
+
+  ok "Node $(node --version) at $(command -v node)"
 }
 
 # ═══ STEP 3: uv ═══
