@@ -50,7 +50,21 @@ step_preflight() {
   command -v sudo >/dev/null || die "sudo not installed."
   sudo -v || die "Unable to obtain sudo."
   command -v curl >/dev/null || die "curl not installed. Run: sudo apt install -y curl"
-  grep -qi microsoft /proc/version 2>/dev/null && ok "WSL detected" || warn "Not WSL — proceeding anyway."
+  if grep -qi microsoft /proc/version 2>/dev/null; then
+    # Distinguish WSL1 (Microsoft-capitalized, no version suffix) from WSL2 (microsoft-standard or WSL2 in kernel release)
+    if grep -qiE "WSL2|microsoft-standard" /proc/sys/kernel/osrelease 2>/dev/null; then
+      ok "WSL2 detected"
+    else
+      die "WSL1 detected — Claude Code and Node.js require WSL2.
+  From Windows PowerShell, upgrade your distro:
+    wsl --list --verbose
+    wsl --set-version <your-distro-name> 2
+    wsl --set-default-version 2
+  Then reopen this terminal and re-run the installer."
+    fi
+  else
+    warn "Not WSL — proceeding anyway."
+  fi
   log "Checking internet connectivity..."
   curl -sS --max-time 5 -o /dev/null https://github.com || die "Can't reach github.com. Check your internet connection and try again."
   ok "Internet reachable"
