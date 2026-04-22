@@ -74,13 +74,33 @@ BREW_PREFIX=""
 step_prereqs() {
   hdr "Installing system prerequisites"
 
-  # Xcode Command Line Tools — installing requires a GUI popup, so fail-fast with instructions
+  # Xcode Command Line Tools — trigger install if missing and wait for user to complete it
   if ! xcode-select -p >/dev/null 2>&1; then
-    die "Xcode Command Line Tools not installed.
-  Run:    xcode-select --install
-  Click 'Install' in the popup, wait for it to finish (~5 min), then re-run this script."
+    log "Xcode Command Line Tools not installed — triggering install popup..."
+    printf "\n  ${YELLOW}A macOS popup will appear shortly. Click 'Install' and agree to the license.${RESET}\n"
+    printf "  ${YELLOW}This download takes ~5-10 minutes. The script will wait for it to complete.${RESET}\n\n"
+
+    xcode-select --install 2>/dev/null || true
+    sleep 2  # let the popup render
+
+    # Poll for completion, with 30-minute timeout
+    local waited=0 max=1800
+    while ! xcode-select -p >/dev/null 2>&1; do
+      if [ "$waited" -ge "$max" ]; then
+        printf "\n"
+        die "Xcode Command Line Tools install didn't complete within 30 minutes.
+  If the popup is still running, wait for it to finish, then re-run this script.
+  If you dismissed the popup, run 'xcode-select --install' manually, complete it, and re-run."
+      fi
+      sleep 10
+      waited=$((waited + 10))
+      printf "."
+    done
+    printf "\n"
+    ok "Xcode Command Line Tools installed"
+  else
+    ok "Xcode Command Line Tools already present"
   fi
-  ok "Xcode Command Line Tools present"
 
   # Homebrew
   if ! command -v brew >/dev/null 2>&1; then

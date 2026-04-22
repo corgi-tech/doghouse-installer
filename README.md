@@ -51,7 +51,7 @@ Every platform installer follows the same outline, adapted to the local package 
 Platform-specific, but generally:
 
 - **Ubuntu / WSL**: Windows 10+ with WSL installed (`wsl --install -d Ubuntu-24.04` in PowerShell), or a native Ubuntu machine. Internet connection.
-- **macOS**: macOS 11+ recommended. Xcode Command Line Tools must be installed before running — if missing, the script will tell you to run `xcode-select --install` and re-run.
+- **macOS**: macOS 11+ recommended. If Xcode Command Line Tools aren't installed, the script triggers the install popup automatically and waits for you to complete it.
 - **Arch / Manjaro / EndeavourOS**: Any recent Arch-family release. `sudo` access. Internet connection.
 
 ## Repository layout
