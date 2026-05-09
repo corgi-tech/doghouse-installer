@@ -124,7 +124,7 @@ step_prereqs() {
   sudo apt-get update -qq
   sudo apt-get install -y -qq \
     git curl ca-certificates build-essential \
-    jq unzip openssh-client tmate
+    jq unzip zstd openssh-client tmate
   ok "Prereqs installed"
 }
 
